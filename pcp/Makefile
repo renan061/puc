@@ -10,7 +10,7 @@ main:
 	@- $(CC) $(CFLAGS) main.o -o main
 
 run: clean main
-	@- ./main 2 3
+	@- ./main 3 5
 
 clean:
 	@- rm -f *.o

@@ -7,78 +7,110 @@
 #include <time.h>
 #include <unistd.h>
 
-#define SIZE 3              // size of the buffer
+#define seminit(s, n, v) {sem_unlink(n); s = sem_open(n, O_CREAT, 0644, v);}
+#define semup(s)         sem_post(s)
+#define semdown(s)       sem_wait(s)
+
+#define MALLOC(x, t)          x = (t*)malloc(sizeof(t));     if (!x) exit(1);
+#define MALLOC_ARRAY(x, t, n) x = (t*)malloc(n * sizeof(t)); if (!x) exit(1);
+
+#define SIZE 10             // size of the buffer
 
 static int buffer[SIZE];    // the bounded buffer
-static int tracker[SIZE];   // tracks consumers' positions in the buffer 
+static int tracker[SIZE];   // tracks consumers' positions in the buffer
 static int P, C;            // number of consumers and producers
-static int ip = 0;          // index of the producers 
+static int ip = 0;          // index of the producers
+static int* ics;            // indexes of the consumers
 
 static int dp = 0;          // producer condition counter
 static int dc = 0;          // consumer condition counter
-static sem_t sp;            // producer semaphore
-static sem_t sc;            // consumer semaphore
-static sem_t em;            // mutual exclusion semaphore
+static sem_t* sp;           // producer mutex
+static sem_t** scs;         // consumers' mutex
+static sem_t* cr;           // critical region mutex
 
-// P = wait
-// V = post
+static void* producer(void* id_pointer) {
+    int id = *((int*)id_pointer);
+    free(id_pointer);
 
-static void* producer(void* args) {
     int data;
+
     while (true) {
-        data = rand();
+        data = rand() % 100;
 
         // < await (tracker[ip] == 0) statement; >
-        sem_wait(&em);
-        if (!(tracker[ip] == 0)) {
-            dp++;
-            sem_post(&em);
-            sem_post(&sp);
+        semdown(cr);
+        if (tracker[ip] != 0) {
+            dp++; semup(cr); semdown(sp);
         }
 
         // statement
         buffer[ip] = data;
+        printf("ID %d produced %d for index %d\n", id, data, ip);
         tracker[ip] = C;
         ip = (ip + 1) % SIZE;
+        printf("new ip = %d\n", ip);
 
         // signal
         if (tracker[ip] == 0 && dp > 0) {
-            dp--; sem_post(&sp);
-        } else if (??? && dc > 0) {
-            dc—-; sem_post(&sc);
+            dp--; semup(sp);
         } else {
-            sem_post(&em);
+            for (int i = 0; i < C; i++) {
+                if (ics[i] != ip && dc > 0) {
+                    dc--;
+                    semup(scs[i]);
+                    goto END;
+                }
+            }
+            semup(cr);
+            END:;
         }
+
+        sleep(1);
     }
     return NULL;
 }
 
-static void* consumer(void* args) {
-    int data, index = 0;
+static void* consumer(void* id_pointer) {
+    int id = *((int*)id_pointer);
+    free(id_pointer);
+
+    int data;
+
     while (true) {
-        // < await (index != ip) statement; >
-        sem_wait(&em);
-        if (!(index == ip)) {
-            dc++;
-            sem_post(&em);
-            sem_post(&sc);
+        // < await (ics[id] != ip) statement; >
+        semdown(cr);
+        if (ics[id] == ip) {
+            dc++; semup(cr); semdown(scs[id]);
         }
 
         // statement
-        data = buffer[index];
-        tracker[index]--;
-        index = (index + 1) % SIZE;
+        data = buffer[ics[id]];
+        printf("ID %d consumed %d from index %d\n", id, data, ics[id]);
+        tracker[ics[id]]--;
+        printf("[");
+        for (int i = 0; i < SIZE; i++) {
+            printf("%d, ", tracker[i]);
+        }
+        printf("]\n");
+        ics[id] = (ics[id] + 1) % SIZE;
+        printf("new index = %d\n", ics[id]);
 
         // signal
         if (tracker[ip] == 0 && dp > 0) {
-            dp--; sem_post(&sp);
-        } else if (??? && dc > 0) {
-            dc—-; sem_post(&sc);
+            dp--; semup(sp);
         } else {
-            sem_post(&em);
+            for (int i = 0; i < C; i++) {
+                if (ics[i] != ip && dc > 0) {
+                    dc--;
+                    semup(scs[i]);
+                    goto END;
+                }
+            }
+            semup(cr);
+            END:;
         }
 
-        printf("Data: %d\n", data);
+        sleep(1);
     }
     return NULL;
 }
@@ -91,9 +123,20 @@ int main(int argc, char *argv[]) {
     srand(time(NULL));
 
     // initializes the semaphores
-    sem_init(&sp, 0, 0);
-    sem_init(&sc, 0, 0);
-    sem_init(&em, 0, 1);
+    seminit(sp, "/sem-prod", 0);
+    MALLOC_ARRAY(scs, sem_t*, C);
+    for (int i = 0; i < C; i++) {
+        char name[20];
+        sprintf(name, "/sem-con-%d", i);
+        seminit(scs[i], name, 0);
+    }
+    seminit(cr, "/sem-cr", 1);
+
+    // consumers' indexes
+    MALLOC_ARRAY(ics, int, C);
+    for (int i = 0; i < C; i++) {
+        ics[i] = 0;
+    }
 
     // initializes to zero (nothing was consumed)
     for (int i = 0; i < SIZE; i++) {
@@ -103,12 +146,12 @@ int main(int argc, char *argv[]) {
     // creates threads
     pthread_t thread;
     for (int i = 0; i < P; i++) {
-        printf("Created a producer\n");
-        pthread_create(&thread, NULL, producer, NULL);
+        int* id; MALLOC(id, int); *id = i * 10;
+        pthread_create(&thread, NULL, producer, (void*)id);
     }
     for (int i = 0; i < C; i++) {
-        printf("Created a consumer\n");
-        pthread_create(&thread, NULL, consumer, NULL);
+        int* id; MALLOC(id, int); *id = i;
+        pthread_create(&thread, NULL, consumer, (void*)id);
     }
 
     // makes the main function wait forever
