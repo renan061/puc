@@ -1,0 +1,54 @@
+==================================================
+=                                                =
+=  Resumo                                        =
+=                                                =
+==================================================
+
+./broadcast <producers> <consumers>
+
+A variável nextfree guarda a próxima posição do buffer em que os produtores
+devem que escrever.
+
+O vetor nextdata (tamanho = número de consumidores, indexado pelos ids dos
+consumidores) guarda qual a posição no buffer em que cada consumidor se
+encontra.
+
+O vetor tracker é um espelho do vetor buffer. Ao invés de dados, as posições
+contém o número de consumidores que não consumiram o dado naquele mesmo índice
+do vetor buffer.
+
+O await do produtor espera até que todos os consumidores tenham liberado a
+próxima posição do buffer (ou seja, tracker[nextfree] == 0). O await do
+produtor espera até que a próxima posição do buffer tenha algum dado (ou
+seja, tracker[nextdata[id]] > 0).
+
+O signal usa um "for" e os consumidores tem um vetor de semáforos porque cada
+consumidor está esperando por uma condição específica ao seu id. Logo, a
+quantidade de condições dos consumidores é dinâmica.
+
+
+==================================================
+=                                                =
+=  Testes                                        =
+=                                                =
+==================================================
+
+1. N produtores x 1 consumidor
+------------------------------
+Igual ao problema clássico.
+
+2. N produtores x N consumidores
+--------------------------------
+Eventualmente o buffer enche e os produtores começam a alternar entre quem
+produz quando todos os consumidores abrem um espaço.
+
+1. N produtores x M consumidores [M != N]
+-----------------------------------------
+Fiz testes com M > N, M < N, M >> N, M << N. Independente dos valores de M e
+N, o resultado ficava igual ao do teste 2.
+
+4. 1 produtor x N consumidores
+------------------------------
+A passagem de bastão e o jeito como o signal funciona fazem com que o produtor
+fique muito tempo esperando pelo lock da região crítica. Independente do N, o
+buffer nunca encheu.
