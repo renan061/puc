@@ -13,7 +13,7 @@ local function efficiency(s, p)
     return s / p
 end
 
-print("\n\n")
+io.write("\n\n")
 
 -- header processors
 io.write("(s, e)")
@@ -37,7 +37,7 @@ for i = 1, 6 do
         local e = string.format("%.3f", efficiency(s, p))
         io.write(string.format("%.3f", s) .. ", " .. e .. "\t")
     end
-    print()
+    io.write("\n")
 end
 
-print("\n\n")
+io.write("\n\n")
