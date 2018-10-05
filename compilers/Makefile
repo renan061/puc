@@ -14,8 +14,9 @@ main:
 	@- $(CPPC) $(CPPFLAGS) main.o -o main
 
 run: clean main
-	@- llvm-as ir/input.ll -o input.ll
+	@- llvm-as ir/input.ll -o input.bc
 	@- ./main input.bc output.bc
+
 
 clean:
 	@- rm -f *.o
