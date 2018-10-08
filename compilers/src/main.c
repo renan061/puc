@@ -1,8 +1,14 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <llvm-c/BitReader.h>
 #include <llvm-c/BitWriter.h>
 #include <llvm-c/Core.h>
+
+#include "bb.h"
+
+static LLVMModuleRef loadmodule(const char* const input);
+static void writemodule(LLVMModuleRef module, const char* const output);
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
@@ -10,10 +16,28 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    const char *const input = argv[1];
-    const char *const output = argv[2];
+    const char* const input = argv[1];
+    const char* const output = argv[2];
+    
+    LLVMModuleRef module = loadmodule(input);
 
-    // auxiliary
+    for (LLVMValueRef function = LLVMGetFirstFunction(module); function;) {
+        bbs_successors_predecessors(function);
+        function = LLVMGetNextFunction(function);
+    }
+
+    writemodule(module, output);
+
+    return 0;
+}
+
+// ==================================================
+//
+//  Auxiliary
+//
+// ==================================================
+
+static LLVMModuleRef loadmodule(const char* const input) {
     LLVMBool ok;
     char* err;
 
@@ -22,7 +46,7 @@ int main(int argc, char* argv[]) {
     ok = !LLVMCreateMemoryBufferWithContentsOfFile(input, &memory_buffer, &err);
     if (!ok) {
         fprintf(stderr, "error reading the input file: %s.\n", err);
-        return 1;
+        exit(1);
     }
 
     // creating the module
@@ -30,17 +54,19 @@ int main(int argc, char* argv[]) {
     ok = !LLVMParseBitcode2(memory_buffer, &module);
     if (!ok) {
         fprintf(stderr, "error: could not create module.\n");
-        return 1;
+        exit(1);
     }
     LLVMDisposeMemoryBuffer(memory_buffer);
 
+    return module;
+}
+
+static void writemodule(LLVMModuleRef module, const char* const output) {
     // writing the module to the output file
-    ok = !LLVMWriteBitcodeToFile(module, output);
+    LLVMBool ok = !LLVMWriteBitcodeToFile(module, output);
     if (!ok) {
         fprintf(stderr, "error writing bitcode to the output file.\n");
-        return 1;
+        exit(1);
     }
     LLVMDisposeModule(module);
-
-    return 0;
 }
