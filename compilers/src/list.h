@@ -6,6 +6,7 @@ typedef struct ListNode ListNode;
 typedef void* ListValue;
 
 extern List* list_new(void);
+extern void list_free(List*);
 
 extern size_t list_size(List*);
 extern ListNode* list_first(List*);

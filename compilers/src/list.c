@@ -24,6 +24,16 @@ List* list_new(void) {
     return list;
 }
 
+void list_free(List* list) {
+    ListNode* temp;
+    for (ListNode* e = list->last; e;) {
+        temp = e->previous;
+        free(e);
+        e = temp;
+    }
+    free(list);
+}
+
 size_t list_size(List* list) {
     return list->size;
 }

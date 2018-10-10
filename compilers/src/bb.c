@@ -10,13 +10,23 @@
 
 static void bbs_dump(BBs);
 
+// TODO: move
+const char* bb_string(void* bb) {
+    return ((BB)bb)->name;
+}
+
+// TODO: move
+bool bb_name_compare(void* bb, void* name) {
+    return ((BB)bb)->name == name;
+}
+
 BB bb_new(LLVMBasicBlockRef block) {
     BB bb;
     MALLOC(bb, struct BB);
     bb->name = LLVMGetBasicBlockName(block);
     bb->llvm = block;
-    bb->successors = list_new();
-    bb->predecessors = list_new();
+    bb->successors = set_new();
+    bb->predecessors = set_new();
     return bb;
 }
 
@@ -25,6 +35,7 @@ BBs bbs_new(size_t size) {
     MALLOC(bbs, struct BBs);
     bbs->size = size;
     MALLOC_ARRAY(bbs->array, BB, size);
+    MALLOC_ARRAY(bbs->dominance, Set, size);
     return bbs;
 }
 
@@ -68,23 +79,66 @@ BBs bbs_successors_predecessors(LLVMValueRef function) {
             LLVMBasicBlockRef block = LLVMGetSuccessor(terminator, j);
             const char* successor_name = LLVMGetBasicBlockName(block);
             BB successor = bbs_find(bbs, successor_name);
-            list_append(bb->successors, (void*)successor);
+            set_add(bb->successors, (SetValue)successor);
         }
     }
 
     // sets the predecessors for each block
     for (unsigned i = 0; i < bbs->size; i++) {
         BB bb = bbs->array[i];
-        ListNode* first = list_first(bb->successors);
-        for (ListNode* node = first; node; node = list_next(node)) {
-            BB successor = (BB)list_value(node);
-            list_append(successor->predecessors, (void*)bb);
+        for (SetIterator* iterator = set_iterator(bb->successors); iterator;) {
+            BB successor = (BB)set_iterator_value(iterator);
+            set_add(successor->predecessors, (SetValue)bb);
+            iterator = set_iterator_next(iterator);
         }
     }
 
     bbs_dump(bbs);
 
     return bbs;
+}
+
+void bbs_dominance(BBs bbs) {
+    // // nodes: Set<Node>, predecessor: Node, r: Node
+    // // nodes: Set<Node>, predecessor: Node, index: Integer
+
+    // // initializes the set that contains all basic blocks
+    // Set all = set_new();
+    // for (int i = 0; i < bbs->size; i++) {
+    //     set_add(all, (SetValue)bbs->array[i]);
+    // }
+
+    // // D: Set<Node>
+    // Set D, T;
+    // // n, p: Node
+    // bool change = true;
+    // // dominance[i] = {i}
+    // bbs->dominance[index] = set_new();
+    // set_add(bbs->dominance[index], bbs->array[i]);
+
+    // for (int i = 1; i < bbs->size; i++) {
+    //     // dominance[i] = {1, 2, ..., N}
+    //     bbs->dominance[i] = set_clone(all);
+    // }
+
+    // do {
+    //     change = false;
+    //     for (int i = 1; i < bbs->size; i++) {
+    //         T = set_clone(all);
+    //         for (ListNode* e = list_first(bbs->array[i]->predecessors); e;) {
+    //             // BB predecessor = (BB)list_value(e);
+    //             // Set temp = 
+    //             // e = list_next(e);
+    //         }
+    //     }
+    // } while (change);
+}
+
+void bbs_df(BBs bbs) {
+    // TODO
+    // DFlocal(x) = { y E Succ(x) | idom(y) != x             }
+    // DFup(x,z)  = { y E DF(z) | idom(z) = x & idom(y) != x }
+    // DF(x)      = DFlocal(x) U U[z E N idom(z) = x] DFup(x, z)
 }
 
 // ==================================================
@@ -97,20 +151,12 @@ static void bbs_dump(BBs bbs) {
     for (unsigned i = 0; i < bbs->size; i++) {
         BB bb = bbs->array[i];
 
-        printf("%s \t(%zu, s[%d])", bb->name, list_size(bb->successors), i);
-        ListNode* first = list_first(bb->successors);
-        for (ListNode* node = first; node; node = list_next(node)) {
-            BB successor = (BB)list_value(node);
-            printf(" %s", successor->name);
-        }
+        printf("%s \t(%zu, s[%d])", bb->name, set_size(bb->successors), i);
+        set_dump(bb->successors, &bb_string);
         printf("\n");
 
-        printf("%s \t(%zu, p[%d])", bb->name, list_size(bb->predecessors), i);
-        first = list_first(bb->predecessors);
-        for (ListNode* node = first; node; node = list_next(node)) {
-            BB predecessor = (BB)list_value(node);
-            printf(" %s", predecessor->name);
-        }
+        printf("%s \t(%zu, p[%d])", bb->name, set_size(bb->predecessors), i);
+        set_dump(bb->predecessors, &bb_string);
         printf("\n===\n");            
     }
 }

@@ -10,12 +10,13 @@ CPPFLAGS := ` llvm-config --cxxflags --ldflags --system-libs`
 CPPFLAGS += ` llvm-config --libs core bitreader bitwriter`
 
 main: objs
-	@- $(CPPC) $(CPPFLAGS) obj/list.o obj/bb.o obj/main.o -o bin/main
+	@- $(CPPC) $(CPPFLAGS) obj/bb.o obj/list.o obj/main.o obj/set.o -o bin/main
 
-objs:
-	@- $(CC) $(CFLAGS) -c src/list.c -o obj/list.o
+objs:	
 	@- $(CC) $(CFLAGS) -c src/bb.c -o obj/bb.o
+	@- $(CC) $(CFLAGS) -c src/list.c -o obj/list.o
 	@- $(CC) $(CFLAGS) -c src/main.c -o obj/main.o
+	@- $(CC) $(CFLAGS) -c src/set.c -o obj/set.o
 
 run: clean main
 	@- # @- ./bin/mongacompiler < input.monga > input.ll
