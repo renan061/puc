@@ -5,15 +5,10 @@
 #include <llvm-c/Core.h>
 
 #include "list.h"
-#include "malloc.h"
+#include "rams.h"
 #include "bb.h"
 
 static void bbs_dump(BBs);
-
-// TODO: move
-const char* bb_string(void* bb) {
-    return ((BB)bb)->name;
-}
 
 // TODO: move
 bool bb_name_compare(void* bb, void* name) {
@@ -48,25 +43,33 @@ BB bbs_find(BBs bbs, const char* name) {
     return NULL;
 }
 
-BBs bbs_successors_predecessors(LLVMValueRef function) {
-    // if the function has no basic blocks, return NULL
-    size_t num_bbs = LLVMCountBasicBlocks(function);
-    if (num_bbs == 0) {
-        return NULL;
+int bbs_find_index(BBs xs, BB x) {
+    for (int i = 0; i < (int)xs->size; i++) {
+        if (xs->array[i] == x) {
+            return i;
+        }
     }
+    return -1;
+}
+
+BBs bbs_successors_predecessors(LLVMValueRef function) {
+    size_t bbs_count = LLVMCountBasicBlocks(function);
+    assert(bbs_count != 0);
 
     // initializes the array of basic blocks
-    BBs bbs = bbs_new(num_bbs);
+    BBs bbs = bbs_new(bbs_count);
 
-    // loops each block, and sets the block in the array of blocks
-    size_t i = 0;
-    for (LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(function); bb;) {
-        bbs->array[i++] = bb_new(bb);
-        bb = LLVMGetNextBasicBlock(bb);
-    }
+    { // loops each block, and sets the block in the array of blocks
+        size_t i = 0;
+        LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(function);
+        while (bb) {
+            bbs->array[i++] = bb_new(bb);
+            bb = LLVMGetNextBasicBlock(bb);
+        }
+    }    
 
     // sets the successors for each block
-    for (unsigned i = 0; i < bbs->size; i++) {
+    for (int i = 0; i < (int)bbs->size; i++) {
         BB bb = bbs->array[i];
 
         // gets the terminator instruction for the current block
@@ -74,17 +77,17 @@ BBs bbs_successors_predecessors(LLVMValueRef function) {
         assert(terminator);
 
         // sets the successors for the current basic block
-        unsigned num_successors = LLVMGetNumSuccessors(terminator);
-        for (unsigned j = 0; j < num_successors; j++) {
-            LLVMBasicBlockRef block = LLVMGetSuccessor(terminator, j);
-            const char* successor_name = LLVMGetBasicBlockName(block);
-            BB successor = bbs_find(bbs, successor_name);
-            set_add(bb->successors, (SetValue)successor);
+        int num_successors = LLVMGetNumSuccessors(terminator);
+        for (int j = 0; j < num_successors; j++) {
+            const char* name = LLVMGetBasicBlockName(
+                LLVMGetSuccessor(terminator, j)
+            );
+            set_add(bb->successors, (SetValue)bbs_find(bbs, name));
         }
     }
 
     // sets the predecessors for each block
-    for (unsigned i = 0; i < bbs->size; i++) {
+    for (int i = 0; i < (int)bbs->size; i++) {
         BB bb = bbs->array[i];
         for (SetIterator* iterator = set_iterator(bb->successors); iterator;) {
             BB successor = (BB)set_iterator_value(iterator);
@@ -93,45 +96,63 @@ BBs bbs_successors_predecessors(LLVMValueRef function) {
         }
     }
 
-    bbs_dump(bbs);
-
     return bbs;
 }
 
 void bbs_dominance(BBs bbs) {
-    // // nodes: Set<Node>, predecessor: Node, r: Node
-    // // nodes: Set<Node>, predecessor: Node, index: Integer
+    // initializes the set that contains all basic blocks
+    Set all = set_new();
+    for (int i = 0; i < (int)bbs->size; i++) {
+        set_add(all, (SetValue)bbs->array[i]);
+    }
 
-    // // initializes the set that contains all basic blocks
-    // Set all = set_new();
-    // for (int i = 0; i < bbs->size; i++) {
-    //     set_add(all, (SetValue)bbs->array[i]);
-    // }
+    Set d;
+    Set t;
+    bool change = true;
 
-    // // D: Set<Node>
-    // Set D, T;
-    // // n, p: Node
-    // bool change = true;
-    // // dominance[i] = {i}
-    // bbs->dominance[index] = set_new();
-    // set_add(bbs->dominance[index], bbs->array[i]);
+    // dominance[entry] = {entry}
+    bbs->dominance[0] = set_new();
+    set_add(bbs->dominance[0], bbs->array[0]);
 
-    // for (int i = 1; i < bbs->size; i++) {
-    //     // dominance[i] = {1, 2, ..., N}
-    //     bbs->dominance[i] = set_clone(all);
-    // }
+    // all nodes except for "entry" start dominanting all nodes
+    for (int i = 1; i < (int)bbs->size; i++) {
+        bbs->dominance[i] = set_clone(all);
+    }
 
-    // do {
-    //     change = false;
-    //     for (int i = 1; i < bbs->size; i++) {
-    //         T = set_clone(all);
-    //         for (ListNode* e = list_first(bbs->array[i]->predecessors); e;) {
-    //             // BB predecessor = (BB)list_value(e);
-    //             // Set temp = 
-    //             // e = list_next(e);
-    //         }
-    //     }
-    // } while (change);
+    do {
+        change = false;
+
+        // all nodes except for "entry"
+        for (int i = 1; i < (int)bbs->size; i++) {
+            BB bb = bbs->array[i];
+
+            t = set_clone(all);
+
+            for (SetIterator si = set_iterator(bb->predecessors); si;) {
+                BB predecessor = set_iterator_value(si);
+
+                // t = t `intersection` dominance[predecessor]
+                Set temp = t;
+                int predecessor_index = bbs_find_index(bbs, predecessor);
+                t = set_intersection(t, bbs->dominance[predecessor_index]);
+                set_free(temp);
+
+                si = set_iterator_next(si);
+            }
+
+            // d = {bb} U t
+            d = set_clone(t);
+            set_add(d, bb);
+            if (!set_equals(d, bbs->dominance[i])) {
+                change = true;
+                bbs->dominance[i] = d;
+            } else {
+                set_free(d);
+            }
+        }
+    } while (change);
+
+    bbs_dump(bbs);
 }
 
 void bbs_df(BBs bbs) {
@@ -147,16 +168,37 @@ void bbs_df(BBs bbs) {
 //
 // ==================================================
 
+static const char* bb_to_name(void* bb) {
+    return ((BB)bb)->name;
+}
+
 static void bbs_dump(BBs bbs) {
-    for (unsigned i = 0; i < bbs->size; i++) {
+    printf("-------------------------\n");
+
+    for (int i = 0; i < (int)bbs->size; i++) {
         BB bb = bbs->array[i];
 
         printf("%s \t(%zu, s[%d])", bb->name, set_size(bb->successors), i);
-        set_dump(bb->successors, &bb_string);
+        set_dump(bb->successors, bb_to_name);
         printf("\n");
 
         printf("%s \t(%zu, p[%d])", bb->name, set_size(bb->predecessors), i);
-        set_dump(bb->predecessors, &bb_string);
-        printf("\n===\n");            
+        set_dump(bb->predecessors, bb_to_name);
+        if (i + 1 < (int)bbs->size) {
+            printf("\n-----\n");
+        } else {
+            printf("\n");
+        }
     }
+
+    printf("-------------------------\n");
+
+    for (int i = 0; i < (int)bbs->size; i++) {
+        BB bb = bbs->array[i];
+        printf("%s \t(%zu, d[%d])", bb->name, set_size(bbs->dominance[i]), i);
+        set_dump(bbs->dominance[i], bb_to_name);
+        printf("\n");
+    }
+
+    printf("-------------------------\n");
 }

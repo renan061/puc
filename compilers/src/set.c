@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 #include "list.h"
-#include "malloc.h"
+#include "rams.h"
 #include "set.h"
 
 struct Set {
@@ -35,6 +35,9 @@ size_t set_size(Set set) {
 }
 
 void set_add(Set set, SetValue value) {
+    if (list_contains(set->list, (ListValue)value)) {
+        return;
+    }
     list_append(set->list, (ListValue)value);
 }
 
@@ -53,12 +56,7 @@ SetValue set_get(Set set, void* value, CompareFunction compare) {
 }
 
 bool set_contains(Set set, SetValue value) {
-    for (ListNode* node = list_first(set->list); node; node = list_next(node)) {
-        if (list_value(node) == (ListValue)value) {
-            return true;
-        }
-    }
-    return false;
+    return list_contains(set->list, (ListValue)value);
 }
 
 bool set_is_empty(Set set) {
@@ -77,13 +75,24 @@ SetValue set_iterator_value(SetIterator iterator) {
     return (SetValue)list_value((ListNode*)iterator);
 }
 
-void set_dump(Set set, const char* (*value_string)(void*)) {
-    printf("[");
-    for (ListNode* e = list_first(set->list); e; e = list_next(e)) {
-        void* value = (void*)list_value(e);
-        printf("%s%s", value_string(value), list_next(e) ? ", " : "");
+void set_dump(Set set, StringifyFunction stringify) {
+    list_dump(set->list, stringify);
+}
+
+bool set_equals(Set s1, Set s2) {
+    List* l1 = s1->list;
+    List* l2 = s2->list;
+
+    if (list_size(l1) != list_size(l2)) {
+        return false;
     }
-    printf("]");
+
+    for (ListNode* e1 = list_first(l1); e1; e1 = list_next(e1)) {
+        if (!list_contains(l2, list_value(e1))) {
+            return false;
+        }
+    }
+    return true;
 }
 
 Set set_intersection(Set set1, Set set2) {

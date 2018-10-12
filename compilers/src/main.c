@@ -21,8 +21,12 @@ int main(int argc, char* argv[]) {
     
     LLVMModuleRef module = loadmodule(input);
 
+
     for (LLVMValueRef function = LLVMGetFirstFunction(module); function;) {
-        bbs_successors_predecessors(function);
+        if (LLVMCountBasicBlocks(function) != 0) {
+            BBs bbs = bbs_successors_predecessors(function);
+            bbs_dominance(bbs);
+        }
         function = LLVMGetNextFunction(function);
     }
 

@@ -3,15 +3,15 @@
 
 #include <stdbool.h>
 
+#include "rams.h"
+
 typedef struct Set* Set;
 
 typedef void* SetValue;
 
 typedef void* SetIterator;
 
-typedef bool (*CompareFunction)(void*, void*);
-
-typedef const char* (*ValueDumpFunction)(void*);
+typedef bool (*CompareFunction)(SetValue, void*);
 
 extern Set set_new(void);
 extern Set set_clone(Set);
@@ -30,8 +30,9 @@ extern SetIterator set_iterator(Set);
 extern SetIterator set_iterator_next(SetIterator);
 extern SetValue set_iterator_value(SetIterator);
 
-extern void set_dump(Set, ValueDumpFunction);
+extern void set_dump(Set, StringifyFunction);
 
+extern bool set_equals(Set, Set);
 extern Set set_intersection(Set, Set);
 
 #endif

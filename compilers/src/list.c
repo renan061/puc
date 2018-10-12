@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 #include "list.h"
-#include "malloc.h"
+#include "rams.h"
 
 struct ListNode {
     ListValue value;
@@ -65,6 +65,15 @@ void list_append(List* list, ListValue value) {
     list->size++;
 }
 
+bool list_contains(List* l, ListValue v) {
+    for (ListNode* e = l->first; e; e = e->next) {
+        if (e->value == v) {
+            return true;
+        }
+    }
+    return false;
+}
+
 ListValue list_value(ListNode* node) {
     return node->value;
 }
@@ -75,4 +84,14 @@ ListNode* list_next(ListNode* node) {
 
 ListNode* list_previous(ListNode* node) {
     return node->previous;
+}
+
+void list_dump(List* list, StringifyFunction stringify) {
+    printf("[");
+    for (ListNode* e = list->first; e;) {
+        ListValue value = e->value;
+        e = list_next(e);
+        printf("%s%s", stringify(value), e ? ", " : "");
+    }
+    printf("]");
 }
