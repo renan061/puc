@@ -122,11 +122,11 @@ open ≤-Reasoning
 
 +-monoˡ-≤ : ∀ {m n p : ℕ} → m ≤ n → m + p ≤ n + p
 +-monoˡ-≤ {m} {n} {p} m≤n = ≤-begin
-  m + p ≤⟨⟩
-  m + p ≤⟨ ≡-then-≤ (+-comm m p) ⟩
-  p + m ≤⟨ +-monoʳ-≤ m≤n ⟩
-  p + n ≤⟨ ≡-then-≤ (+-comm p n) ⟩
-  n + p ≤-∎
+  m + p  ≤⟨⟩
+  m + p  ≤⟨ ≡-then-≤ (+-comm m p) ⟩
+  p + m  ≤⟨ +-monoʳ-≤ m≤n ⟩
+  p + n  ≤⟨ ≡-then-≤ (+-comm p n) ⟩
+  n + p  ≤-∎
     where
       ≡-then-≤ : ∀ {m n : ℕ} → m ≡ n → m ≤ n
       ≡-then-≤ {zero} _ = z≤n

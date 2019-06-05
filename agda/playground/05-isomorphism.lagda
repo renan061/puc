@@ -1,5 +1,7 @@
 \begin{code}
 
+module 5-isomorphism where
+
 import Relation.Binary.PropositionalEquality as Eq
 open Eq using (_≡_; refl; cong; cong-app)
 open Eq.≡-Reasoning
@@ -167,6 +169,7 @@ open ≲-Reasoning
 --------------------------------------------------------------------------------
 
 -- exercise [≃-implies-≲]
+
 -- show that every isomorphism implies an embedding
 
 ≃-implies-≲ : ∀ {A B : Set} → A ≃ B → A ≲ B
@@ -178,9 +181,10 @@ open ≲-Reasoning
 
 --------------------------------------------------------------------------------
 
--- exercise [_⇔_]
+-- exercise [_⇔_] (recommended)
 
--- equivalence of propositions (also known as “if and only if”)
+-- define a equivalence of propositions (also known as “if and only if”)
+
 record _⇔_ (A B : Set) : Set where
   field
     to   : A → B
@@ -189,6 +193,7 @@ record _⇔_ (A B : Set) : Set where
 open _⇔_
 
 -- show that equivalence is reflexive, symmetric, and transitive
+
 ⇔-refl : ∀ {A : Set} → A ⇔ A
 ⇔-refl = record
   { to = λ x → x
@@ -197,8 +202,8 @@ open _⇔_
 
 ⇔-sym : ∀ {A B : Set} → A ⇔ B → B ⇔ A
 ⇔-sym A⇔B = record
-  { to = λ x → from A⇔B x
-  ; from = λ x → to A⇔B x
+  { to = from A⇔B
+  ; from = to A⇔B
   }
 
 ⇔-trans : ∀ {A B C : Set} → A ⇔ B → B ⇔ C  → A ⇔ C
@@ -211,46 +216,49 @@ open _⇔_
 
 -- exercise [Bin-embedding] (stretch)
 
-data Bin : Set where
-  nil : Bin
-  x0_ : Bin → Bin
-  x1_ : Bin → Bin
+module Bin where
 
-inc : Bin → Bin
-inc nil = x1 nil
-inc (x0 b) = x1 b
-inc (x1 b) = x0 (inc b)
+  data Bin : Set where
+    nil : Bin
+    x0_ : Bin → Bin
+    x1_ : Bin → Bin
+
+  inc : Bin → Bin
+  inc nil = x1 nil
+  inc (x0 b) = x1 b
+  inc (x1 b) = x0 (inc b)
+
+  to : ℕ → Bin
+  to zero = x0 nil
+  to (suc n) = inc (to n)
+
+  from : Bin → ℕ
+  from nil = 0
+  from (x0 b) = from b + from b
+  from (x1 b) = suc (from b + from b)
+
+  from-inc≡suc-from : ∀ (x : Bin) → from (inc x) ≡ suc (from x)
+  from-inc≡suc-from nil = refl
+  from-inc≡suc-from (x0 x) = refl
+  from-inc≡suc-from (x1 x) rewrite
+    from-inc≡suc-from x | +-suc (from x) (from x) = refl
+
+  from-to≡id : ∀ (n : ℕ) → from (to n) ≡ n
+  from-to≡id zero = refl
+  from-to≡id (suc n) rewrite from-inc≡suc-from (to n) | from-to≡id n = refl
+
+-- establish that there is an embedding of ℕ into Bin
 
 ℕ-≲-Bin : ℕ ≲ Bin
 ℕ-≲-Bin = record
-  { to = bin-to
-  ; from = bin-from
-  ; from∘to = from-to≡id
+  { to      = Bin.to
+  ; from    = Bin.from
+  ; from∘to = Bin.from-to≡id
   }
-  where
-    -- to
-    bin-to : ℕ → Bin
-    bin-to zero = x0 nil
-    bin-to (suc n) = inc (bin-to n)
-    -- from
-    bin-from : Bin → ℕ
-    bin-from nil = 0
-    bin-from (x0 b) = bin-from b + bin-from b
-    bin-from (x1 b) = suc (bin-from b + bin-from b)
-    -- from-inc ≡ suc-from
-    from-inc≡suc-from : ∀ (x : Bin) → bin-from (inc x) ≡ suc (bin-from x)
-    from-inc≡suc-from nil = refl
-    from-inc≡suc-from (x0 x) = refl
-    from-inc≡suc-from (x1 x) rewrite
-      from-inc≡suc-from x | +-suc (bin-from x) (bin-from x) = refl
-    -- from-to ≡ id
-    from-to≡id : ∀ (n : ℕ) → bin-from (bin-to n) ≡ n
-    from-to≡id zero = refl
-    from-to≡id (suc n)
-      rewrite from-inc≡suc-from (bin-to n) | from-to≡id n = refl
 
--- why do to and from not form an isomorphism?
--- because of the leading-zero alternative representations
+-- why is there not an isomorphism?
+
+-- because of the leading-zero alternative representations for binaries
 
 --------------------------------------------------------------------------------
 

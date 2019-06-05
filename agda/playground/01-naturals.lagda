@@ -68,7 +68,7 @@ _ =
 
 -- exponentiation
 _^_ : N -> N -> N
-m ^ zero    = 1 
+m ^ zero    = 1
 m ^ (suc n) = (m ^ n) * m
 
 _ : 3 ^ 4 ≡ 81
